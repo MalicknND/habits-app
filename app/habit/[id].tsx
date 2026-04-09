@@ -12,6 +12,7 @@ import {
   Pressable,
   Text,
   TextInput,
+  useColorScheme,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -21,9 +22,11 @@ import {
   parseTodayTimeHHmm,
   toTimeHHmm,
 } from "@/lib/date";
+import { syncHabitNotifications } from "@/lib/habitNotifications";
 import { getHabitById, updateHabit } from "@/lib/habitsStorage";
 
 export default function EditHabitScreen() {
+  const colorScheme = useColorScheme();
   const { id: rawId } = useLocalSearchParams<{ id: string }>();
   const id = typeof rawId === "string" ? rawId : rawId?.[0];
 
@@ -97,6 +100,7 @@ export default function EditHabitScreen() {
     setSaving(true);
     try {
       await updateHabit(id, { title: trimmed, time: toTimeHHmm(timeDate) });
+      await syncHabitNotifications();
       router.back();
     } catch (e) {
       Alert.alert(
@@ -110,24 +114,27 @@ export default function EditHabitScreen() {
 
   if (loading || !id) {
     return (
-      <View className="flex-1 items-center justify-center bg-neutral-50">
-        <ActivityIndicator size="large" color="#2563eb" />
+      <View className="flex-1 items-center justify-center bg-neutral-50 dark:bg-neutral-950">
+        <ActivityIndicator size="large" color="#60a5fa" />
       </View>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-neutral-50" edges={["bottom"]}>
+    <SafeAreaView
+      className="flex-1 bg-neutral-50 dark:bg-neutral-950"
+      edges={["bottom"]}
+    >
       <KeyboardAvoidingView
         className="flex-1"
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <View className="flex-1 px-5 pt-2">
-          <Text className="text-sm text-neutral-500">
+          <Text className="text-sm text-neutral-500 dark:text-neutral-400">
             Update title or reminder time.
           </Text>
 
-          <Text className="mb-1.5 mt-8 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+          <Text className="mb-1.5 mt-8 text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
             Title
           </Text>
           <TextInput
@@ -135,12 +142,12 @@ export default function EditHabitScreen() {
             onChangeText={setTitle}
             placeholder="e.g. Morning run"
             placeholderTextColor="#a3a3a3"
-            className="rounded-xl border border-neutral-200 bg-white px-4 py-3.5 text-base text-neutral-900"
+            className="rounded-xl border border-neutral-200 bg-white px-4 py-3.5 text-base text-neutral-900 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-50"
             editable={!saving}
             returnKeyType="next"
           />
 
-          <Text className="mb-1.5 mt-6 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+          <Text className="mb-1.5 mt-6 text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
             Time
           </Text>
           {Platform.OS === "web" ? (
@@ -149,7 +156,7 @@ export default function EditHabitScreen() {
               onChangeText={setWebTime}
               placeholder="HH:mm"
               placeholderTextColor="#a3a3a3"
-              className="rounded-xl border border-neutral-200 bg-white px-4 py-3.5 text-base text-neutral-900"
+              className="rounded-xl border border-neutral-200 bg-white px-4 py-3.5 text-base text-neutral-900 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-50"
               editable={!saving}
               autoCapitalize="none"
               keyboardType="numbers-and-punctuation"
@@ -158,9 +165,9 @@ export default function EditHabitScreen() {
             <Pressable
               onPress={openTimePicker}
               disabled={saving}
-              className="rounded-xl border border-neutral-200 bg-white px-4 py-3.5 active:bg-neutral-100"
+              className="rounded-xl border border-neutral-200 bg-white px-4 py-3.5 active:bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-900 dark:active:bg-neutral-800"
             >
-              <Text className="text-base tabular-nums text-neutral-900">
+              <Text className="text-base tabular-nums text-neutral-900 dark:text-neutral-50">
                 {toTimeHHmm(time)}
               </Text>
             </Pressable>
@@ -190,11 +197,11 @@ export default function EditHabitScreen() {
             onPress={() => setIosPickerOpen(false)}
           >
             <Pressable
-              className="rounded-t-2xl bg-white px-4 pb-6 pt-3"
+              className="rounded-t-2xl bg-white px-4 pb-6 pt-3 dark:bg-neutral-900"
               onPress={(e) => e.stopPropagation()}
             >
               <View className="mb-2 flex-row items-center justify-between">
-                <Text className="text-base font-semibold text-neutral-900">
+                <Text className="text-base font-semibold text-neutral-900 dark:text-neutral-50">
                   Time
                 </Text>
                 <Pressable
@@ -210,7 +217,7 @@ export default function EditHabitScreen() {
                 value={time}
                 mode="time"
                 display="spinner"
-                themeVariant="light"
+                themeVariant={colorScheme === "dark" ? "dark" : "light"}
                 onChange={(_, picked) => {
                   if (picked) setTime(picked);
                 }}

@@ -1,9 +1,28 @@
 import { Stack } from "expo-router";
+import { useEffect } from "react";
+import { useColorScheme, View } from "react-native";
+import { StatusBar } from "expo-status-bar";
+
+import {
+  configureNotificationHandler,
+  syncHabitNotifications,
+} from "@/lib/habitNotifications";
+
 import "./global.css";
 
-export default function RootLayout() {
+configureNotificationHandler();
+
+function RootStack() {
+  const scheme = useColorScheme();
+  const dark = scheme === "dark";
+
   return (
-    <Stack screenOptions={{ headerShown: false }}>
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: "transparent" },
+      }}
+    >
       <Stack.Screen name="(tabs)" />
       <Stack.Screen
         name="habit/[id]"
@@ -12,10 +31,33 @@ export default function RootLayout() {
           title: "Edit habit",
           presentation: "modal",
           headerShadowVisible: false,
-          headerStyle: { backgroundColor: "#fafafa" },
-          headerTintColor: "#2563eb",
+          headerStyle: { backgroundColor: dark ? "#171717" : "#fafafa" },
+          headerTintColor: "#60a5fa",
+          headerTitleStyle: { color: dark ? "#fafafa" : "#171717" },
         }}
       />
     </Stack>
+  );
+}
+
+export default function RootLayout() {
+  const scheme = useColorScheme();
+  const dark = scheme === "dark";
+
+  useEffect(() => {
+    void syncHabitNotifications();
+  }, []);
+
+  return (
+    <View
+      className={dark ? "dark flex-1" : "flex-1"}
+      style={{
+        flex: 1,
+        backgroundColor: dark ? "#0a0a0a" : "#fafafa",
+      }}
+    >
+      <StatusBar style={dark ? "light" : "dark"} />
+      <RootStack />
+    </View>
   );
 }

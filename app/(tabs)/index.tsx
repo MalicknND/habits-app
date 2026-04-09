@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { syncHabitNotifications } from "@/lib/habitNotifications";
 import { localDateYMD } from "@/lib/date";
 import type { Habit } from "@/types";
 import {
@@ -86,6 +87,7 @@ export default function HomeScreen() {
             void (async () => {
               try {
                 await deleteHabit(habit.id);
+                await syncHabitNotifications();
                 await refresh();
               } catch (e) {
                 Alert.alert(
@@ -117,25 +119,28 @@ export default function HomeScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-neutral-50">
-        <ActivityIndicator size="large" color="#2563eb" />
+      <SafeAreaView className="flex-1 items-center justify-center bg-neutral-50 dark:bg-neutral-950">
+        <ActivityIndicator size="large" color="#60a5fa" />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-neutral-50" edges={["top"]}>
-      <View className="border-b border-neutral-200 bg-neutral-50 px-5 pb-4 pt-2">
-        <Text className="text-2xl font-bold tracking-tight text-neutral-900">
+    <SafeAreaView
+      className="flex-1 bg-neutral-50 dark:bg-neutral-950"
+      edges={["top"]}
+    >
+      <View className="border-b border-neutral-200 bg-neutral-50 px-5 pb-4 pt-2 dark:border-neutral-800 dark:bg-neutral-950">
+        <Text className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50">
           Today
         </Text>
-        <Text className="mt-1 text-base text-neutral-600">
+        <Text className="mt-1 text-base text-neutral-600 dark:text-neutral-300">
           Streak{" "}
-          <Text className="font-semibold text-neutral-900">
+          <Text className="font-semibold text-neutral-900 dark:text-neutral-50">
             🔥 {streak} day{streak === 1 ? "" : "s"}
           </Text>
         </Text>
-        <Text className="mt-2 text-xs text-neutral-400">
+        <Text className="mt-2 text-xs text-neutral-400 dark:text-neutral-500">
           Long press a habit to edit or delete.
         </Text>
       </View>
@@ -151,10 +156,10 @@ export default function HomeScreen() {
         }}
         ListEmptyComponent={
           <View className="items-center py-16">
-            <Text className="text-center text-base text-neutral-600">
+            <Text className="text-center text-base text-neutral-600 dark:text-neutral-300">
               No habits yet.
             </Text>
-            <Text className="mt-2 text-center text-sm text-neutral-500">
+            <Text className="mt-2 text-center text-sm text-neutral-500 dark:text-neutral-400">
               Open the Add tab to create your first one.
             </Text>
           </View>
@@ -168,13 +173,13 @@ export default function HomeScreen() {
               onPress={() => onToggle(item.habit.id)}
               onLongPress={() => showRowMenu(item.habit)}
               delayLongPress={380}
-              className="flex-row items-center gap-3 rounded-2xl border border-neutral-200 bg-white px-4 py-3.5 active:bg-neutral-100"
+              className="flex-row items-center gap-3 rounded-2xl border border-neutral-200 bg-white px-4 py-3.5 active:bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-900 dark:active:bg-neutral-800"
             >
               <View
                 className={`h-7 w-7 items-center justify-center rounded-lg border-2 ${
                   item.completed
                     ? "border-blue-600 bg-blue-600"
-                    : "border-neutral-300 bg-white"
+                    : "border-neutral-300 bg-white dark:border-neutral-600 dark:bg-neutral-900"
                 }`}
               >
                 {item.completed ? (
@@ -183,12 +188,12 @@ export default function HomeScreen() {
               </View>
               <View className="min-w-0 flex-1 flex-row items-center justify-between gap-3">
                 <Text
-                  className="flex-1 text-base font-medium text-neutral-900"
+                  className="flex-1 text-base font-medium text-neutral-900 dark:text-neutral-50"
                   numberOfLines={2}
                 >
                   {item.habit.title}
                 </Text>
-                <Text className="shrink-0 text-sm tabular-nums text-neutral-500">
+                <Text className="shrink-0 text-sm tabular-nums text-neutral-500 dark:text-neutral-400">
                   {item.habit.time}
                 </Text>
               </View>
