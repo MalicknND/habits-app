@@ -1,8 +1,9 @@
 import { Stack } from "expo-router";
 import { useEffect } from "react";
-import { useColorScheme, View } from "react-native";
+import { View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 
+import { AppThemeProvider, useAppTheme } from "@/context/AppTheme";
 import {
   configureNotificationHandler,
   syncHabitNotifications,
@@ -13,8 +14,8 @@ import "./global.css";
 configureNotificationHandler();
 
 function RootStack() {
-  const scheme = useColorScheme();
-  const dark = scheme === "dark";
+  const { resolvedScheme } = useAppTheme();
+  const dark = resolvedScheme === "dark";
 
   return (
     <Stack
@@ -40,9 +41,9 @@ function RootStack() {
   );
 }
 
-export default function RootLayout() {
-  const scheme = useColorScheme();
-  const dark = scheme === "dark";
+function RootLayoutInner() {
+  const { resolvedScheme } = useAppTheme();
+  const dark = resolvedScheme === "dark";
 
   useEffect(() => {
     void syncHabitNotifications();
@@ -59,5 +60,13 @@ export default function RootLayout() {
       <StatusBar style={dark ? "light" : "dark"} />
       <RootStack />
     </View>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <AppThemeProvider>
+      <RootLayoutInner />
+    </AppThemeProvider>
   );
 }

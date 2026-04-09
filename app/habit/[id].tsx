@@ -2,7 +2,7 @@ import DateTimePicker, {
   DateTimePickerAndroid,
 } from "@react-native-community/datetimepicker";
 import { router, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -12,11 +12,11 @@ import {
   Pressable,
   Text,
   TextInput,
-  useColorScheme,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { useAppTheme } from "@/context/AppTheme";
 import {
   dateFromTimeHHmm,
   parseTodayTimeHHmm,
@@ -24,9 +24,12 @@ import {
 } from "@/lib/date";
 import { syncHabitNotifications } from "@/lib/habitNotifications";
 import { getHabitById, updateHabit } from "@/lib/habitsStorage";
+import { getAppChrome } from "@/lib/screenBackground";
 
 export default function EditHabitScreen() {
-  const colorScheme = useColorScheme();
+  const { resolvedScheme } = useAppTheme();
+  const c = useMemo(() => getAppChrome(resolvedScheme), [resolvedScheme]);
+
   const { id: rawId } = useLocalSearchParams<{ id: string }>();
   const id = typeof rawId === "string" ? rawId : rawId?.[0];
 
@@ -112,42 +115,50 @@ export default function EditHabitScreen() {
     }
   };
 
+  const inputStyle = {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.inputBg,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: c.text,
+  };
+
   if (loading || !id) {
     return (
-      <View className="flex-1 items-center justify-center bg-neutral-50 dark:bg-neutral-950">
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: c.bg }}>
         <ActivityIndicator size="large" color="#60a5fa" />
       </View>
     );
   }
 
   return (
-    <SafeAreaView
-      className="flex-1 bg-neutral-50 dark:bg-neutral-950"
-      edges={["bottom"]}
-    >
+    <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={["bottom"]}>
       <KeyboardAvoidingView
-        className="flex-1"
+        style={{ flex: 1, backgroundColor: c.bg }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <View className="flex-1 px-5 pt-2">
-          <Text className="text-sm text-neutral-500 dark:text-neutral-400">
+        <View style={{ flex: 1, paddingHorizontal: 20, paddingTop: 8, backgroundColor: c.bg }}>
+          <Text style={{ fontSize: 14, color: c.textMuted }}>
             Update title or reminder time.
           </Text>
 
-          <Text className="mb-1.5 mt-8 text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+          <Text style={{ marginBottom: 6, marginTop: 32, fontSize: 11, fontWeight: "600", letterSpacing: 0.5, textTransform: "uppercase", color: c.textMuted }}>
             Title
           </Text>
           <TextInput
             value={title}
             onChangeText={setTitle}
             placeholder="e.g. Morning run"
-            placeholderTextColor="#a3a3a3"
-            className="rounded-xl border border-neutral-200 bg-white px-4 py-3.5 text-base text-neutral-900 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-50"
+            placeholderTextColor={c.hint}
+            style={inputStyle}
             editable={!saving}
             returnKeyType="next"
           />
 
-          <Text className="mb-1.5 mt-6 text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+          <Text style={{ marginBottom: 6, marginTop: 24, fontSize: 11, fontWeight: "600", letterSpacing: 0.5, textTransform: "uppercase", color: c.textMuted }}>
             Time
           </Text>
           {Platform.OS === "web" ? (
@@ -155,8 +166,8 @@ export default function EditHabitScreen() {
               value={webTime}
               onChangeText={setWebTime}
               placeholder="HH:mm"
-              placeholderTextColor="#a3a3a3"
-              className="rounded-xl border border-neutral-200 bg-white px-4 py-3.5 text-base text-neutral-900 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-50"
+              placeholderTextColor={c.hint}
+              style={inputStyle}
               editable={!saving}
               autoCapitalize="none"
               keyboardType="numbers-and-punctuation"
@@ -165,20 +176,33 @@ export default function EditHabitScreen() {
             <Pressable
               onPress={openTimePicker}
               disabled={saving}
-              className="rounded-xl border border-neutral-200 bg-white px-4 py-3.5 active:bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-900 dark:active:bg-neutral-800"
+              style={({ pressed }) => ({
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: c.border,
+                backgroundColor: pressed ? c.cardPressed : c.inputBg,
+                paddingHorizontal: 16,
+                paddingVertical: 14,
+              })}
             >
-              <Text className="text-base tabular-nums text-neutral-900 dark:text-neutral-50">
-                {toTimeHHmm(time)}
-              </Text>
+              <Text style={{ fontSize: 16, color: c.text }}>{toTimeHHmm(time)}</Text>
             </Pressable>
           )}
 
           <Pressable
             onPress={() => void save()}
             disabled={saving}
-            className="mt-auto mb-4 items-center rounded-xl bg-blue-600 py-4 active:bg-blue-700 disabled:opacity-50"
+            style={{
+              marginTop: "auto",
+              marginBottom: 16,
+              alignItems: "center",
+              borderRadius: 12,
+              backgroundColor: "#2563eb",
+              paddingVertical: 16,
+              opacity: saving ? 0.5 : 1,
+            }}
           >
-            <Text className="text-base font-semibold text-white">
+            <Text style={{ fontSize: 16, fontWeight: "600", color: "#fff" }}>
               {saving ? "Saving…" : "Save changes"}
             </Text>
           </Pressable>
@@ -193,31 +217,31 @@ export default function EditHabitScreen() {
           onRequestClose={() => setIosPickerOpen(false)}
         >
           <Pressable
-            className="flex-1 justify-end bg-black/40"
+            style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.4)" }}
             onPress={() => setIosPickerOpen(false)}
           >
             <Pressable
-              className="rounded-t-2xl bg-white px-4 pb-6 pt-3 dark:bg-neutral-900"
+              style={{
+                borderTopLeftRadius: 16,
+                borderTopRightRadius: 16,
+                backgroundColor: resolvedScheme === "dark" ? "#171717" : "#fff",
+                paddingHorizontal: 16,
+                paddingBottom: 24,
+                paddingTop: 12,
+              }}
               onPress={(e) => e.stopPropagation()}
             >
-              <View className="mb-2 flex-row items-center justify-between">
-                <Text className="text-base font-semibold text-neutral-900 dark:text-neutral-50">
-                  Time
-                </Text>
-                <Pressable
-                  onPress={() => setIosPickerOpen(false)}
-                  hitSlop={12}
-                >
-                  <Text className="text-base font-semibold text-blue-600">
-                    Done
-                  </Text>
+              <View style={{ marginBottom: 8, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                <Text style={{ fontSize: 16, fontWeight: "600", color: c.text }}>Time</Text>
+                <Pressable onPress={() => setIosPickerOpen(false)} hitSlop={12}>
+                  <Text style={{ fontSize: 16, fontWeight: "600", color: "#60a5fa" }}>Done</Text>
                 </Pressable>
               </View>
               <DateTimePicker
                 value={time}
                 mode="time"
                 display="spinner"
-                themeVariant={colorScheme === "dark" ? "dark" : "light"}
+                themeVariant={resolvedScheme === "dark" ? "dark" : "light"}
                 onChange={(_, picked) => {
                   if (picked) setTime(picked);
                 }}

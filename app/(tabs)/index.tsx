@@ -1,5 +1,5 @@
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -10,8 +10,10 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { useAppTheme } from "@/context/AppTheme";
 import { syncHabitNotifications } from "@/lib/habitNotifications";
 import { localDateYMD } from "@/lib/date";
+import { getAppChrome } from "@/lib/screenBackground";
 import type { Habit } from "@/types";
 import {
   deleteHabit,
@@ -23,6 +25,9 @@ import {
 import { maxStreakAcrossHabits } from "@/lib/streak";
 
 export default function HomeScreen() {
+  const { resolvedScheme } = useAppTheme();
+  const c = useMemo(() => getAppChrome(resolvedScheme), [resolvedScheme]);
+
   const [rows, setRows] = useState<TodayHabitRow[]>([]);
   const [streak, setStreak] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -119,28 +124,35 @@ export default function HomeScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-neutral-50 dark:bg-neutral-950">
+      <SafeAreaView
+        style={{ flex: 1, backgroundColor: c.bg, justifyContent: "center", alignItems: "center" }}
+        edges={["top"]}
+      >
         <ActivityIndicator size="large" color="#60a5fa" />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView
-      className="flex-1 bg-neutral-50 dark:bg-neutral-950"
-      edges={["top"]}
-    >
-      <View className="border-b border-neutral-200 bg-neutral-50 px-5 pb-4 pt-2 dark:border-neutral-800 dark:bg-neutral-950">
-        <Text className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50">
+    <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={["top"]}>
+      <View
+        style={{
+          borderBottomWidth: 1,
+          borderBottomColor: c.border,
+          backgroundColor: c.bg,
+          paddingHorizontal: 20,
+          paddingBottom: 16,
+          paddingTop: 8,
+        }}
+      >
+        <Text style={{ fontSize: 24, fontWeight: "700", color: c.text }}>
           Today
         </Text>
-        <Text className="mt-1 text-base text-neutral-600 dark:text-neutral-300">
+        <Text style={{ marginTop: 4, fontSize: 16, color: c.textSubtle }}>
           Streak{" "}
-          <Text className="font-semibold text-neutral-900 dark:text-neutral-50">
-            🔥 {streak} day{streak === 1 ? "" : "s"}
-          </Text>
+          <Text style={{ fontWeight: "600", color: c.text }}>🔥 {streak} day{streak === 1 ? "" : "s"}</Text>
         </Text>
-        <Text className="mt-2 text-xs text-neutral-400 dark:text-neutral-500">
+        <Text style={{ marginTop: 8, fontSize: 12, color: c.hint }}>
           Long press a habit to edit or delete.
         </Text>
       </View>
@@ -148,23 +160,25 @@ export default function HomeScreen() {
       <FlatList
         data={rows}
         keyExtractor={(item) => item.habit.id}
+        style={{ flex: 1, backgroundColor: c.bg }}
         contentContainerStyle={{
           paddingHorizontal: 20,
           paddingTop: 16,
           paddingBottom: 28,
           flexGrow: 1,
+          backgroundColor: c.bg,
         }}
         ListEmptyComponent={
-          <View className="items-center py-16">
-            <Text className="text-center text-base text-neutral-600 dark:text-neutral-300">
+          <View style={{ alignItems: "center", paddingVertical: 64 }}>
+            <Text style={{ textAlign: "center", fontSize: 16, color: c.textSubtle }}>
               No habits yet.
             </Text>
-            <Text className="mt-2 text-center text-sm text-neutral-500 dark:text-neutral-400">
+            <Text style={{ marginTop: 8, textAlign: "center", fontSize: 14, color: c.textMuted }}>
               Open the Add tab to create your first one.
             </Text>
           </View>
         }
-        ItemSeparatorComponent={() => <View className="h-3" />}
+        ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
         renderItem={({ item }) => {
           const disabled = busyId === item.habit.id;
           return (
@@ -173,27 +187,40 @@ export default function HomeScreen() {
               onPress={() => onToggle(item.habit.id)}
               onLongPress={() => showRowMenu(item.habit)}
               delayLongPress={380}
-              className="flex-row items-center gap-3 rounded-2xl border border-neutral-200 bg-white px-4 py-3.5 active:bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-900 dark:active:bg-neutral-800"
+              style={({ pressed }) => ({
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 12,
+                borderRadius: 16,
+                borderWidth: 1,
+                borderColor: c.border,
+                backgroundColor: pressed ? c.cardPressed : c.card,
+                paddingHorizontal: 16,
+                paddingVertical: 14,
+                opacity: disabled ? 0.6 : 1,
+              })}
             >
               <View
-                className={`h-7 w-7 items-center justify-center rounded-lg border-2 ${
-                  item.completed
-                    ? "border-blue-600 bg-blue-600"
-                    : "border-neutral-300 bg-white dark:border-neutral-600 dark:bg-neutral-900"
-                }`}
+                style={{
+                  height: 28,
+                  width: 28,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: 8,
+                  borderWidth: 2,
+                  borderColor: item.completed ? "#2563eb" : c.checkBorder,
+                  backgroundColor: item.completed ? "#2563eb" : c.inputBg,
+                }}
               >
                 {item.completed ? (
-                  <Text className="text-sm font-bold text-white">✓</Text>
+                  <Text style={{ fontSize: 14, fontWeight: "700", color: "#fff" }}>✓</Text>
                 ) : null}
               </View>
-              <View className="min-w-0 flex-1 flex-row items-center justify-between gap-3">
-                <Text
-                  className="flex-1 text-base font-medium text-neutral-900 dark:text-neutral-50"
-                  numberOfLines={2}
-                >
+              <View style={{ flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                <Text style={{ flex: 1, fontSize: 16, fontWeight: "500", color: c.text }} numberOfLines={2}>
                   {item.habit.title}
                 </Text>
-                <Text className="shrink-0 text-sm tabular-nums text-neutral-500 dark:text-neutral-400">
+                <Text style={{ fontSize: 14, color: c.textMuted }}>
                   {item.habit.time}
                 </Text>
               </View>

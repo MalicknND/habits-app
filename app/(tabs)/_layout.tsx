@@ -1,10 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
-import { useColorScheme } from "react-native";
+
+import { useAppTheme } from "@/context/AppTheme";
 
 export default function TabsLayout() {
-  const scheme = useColorScheme();
-  const dark = scheme === "dark";
+  const { resolvedScheme } = useAppTheme();
+  const dark = resolvedScheme === "dark";
 
   return (
     <Tabs
@@ -20,6 +21,10 @@ export default function TabsLayout() {
         tabBarStyle: {
           backgroundColor: dark ? "#0a0a0a" : "#fafafa",
           borderTopColor: dark ? "#262626" : "#e5e5e5",
+        },
+        // Fond de la zone entre header et tab bar (défaut RN = blanc sans ça).
+        sceneStyle: {
+          backgroundColor: dark ? "#0a0a0a" : "#fafafa",
         },
       }}
     >
@@ -47,6 +52,15 @@ export default function TabsLayout() {
           title: "New habit",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="add-circle-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: "Réglages",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="settings-outline" size={size} color={color} />
           ),
         }}
       />
