@@ -42,3 +42,12 @@ export function parseTodayTimeHHmm(s: string, base = new Date()): Date | null {
   d.setHours(Number(m[1]), Number(m[2]), 0, 0);
   return d;
 }
+
+/** Map stored `HH:mm` to a `Date` on `base`’s local calendar day (fallback 09:00). */
+export function dateFromTimeHHmm(hm: TimeHHmm, base = new Date()): Date {
+  const d = parseTodayTimeHHmm(hm, base);
+  if (d) return d;
+  const f = new Date(base.getFullYear(), base.getMonth(), base.getDate());
+  f.setHours(9, 0, 0, 0);
+  return f;
+}

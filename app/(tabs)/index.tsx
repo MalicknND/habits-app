@@ -1,4 +1,4 @@
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
@@ -11,7 +11,9 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { localDateYMD } from "@/lib/date";
+import type { Habit } from "@/types";
 import {
+  deleteHabit,
   getHabitLogs,
   getTodayHabits,
   toggleHabitCompletion,
@@ -71,6 +73,48 @@ export default function HomeScreen() {
     }
   };
 
+  const confirmDelete = (habit: Habit) => {
+    Alert.alert(
+      "Delete habit?",
+      `“${habit.title}” and its history will be removed.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            void (async () => {
+              try {
+                await deleteHabit(habit.id);
+                await refresh();
+              } catch (e) {
+                Alert.alert(
+                  "Error",
+                  e instanceof Error ? e.message : "Could not delete.",
+                );
+              }
+            })();
+          },
+        },
+      ],
+    );
+  };
+
+  const showRowMenu = (habit: Habit) => {
+    Alert.alert(habit.title, "Edit or delete this habit.", [
+      {
+        text: "Edit",
+        onPress: () => router.push(`/habit/${habit.id}`),
+      },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => confirmDelete(habit),
+      },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  };
+
   if (loading) {
     return (
       <SafeAreaView className="flex-1 items-center justify-center bg-neutral-50">
@@ -90,6 +134,9 @@ export default function HomeScreen() {
           <Text className="font-semibold text-neutral-900">
             🔥 {streak} day{streak === 1 ? "" : "s"}
           </Text>
+        </Text>
+        <Text className="mt-2 text-xs text-neutral-400">
+          Long press a habit to edit or delete.
         </Text>
       </View>
 
@@ -119,6 +166,8 @@ export default function HomeScreen() {
             <Pressable
               disabled={disabled}
               onPress={() => onToggle(item.habit.id)}
+              onLongPress={() => showRowMenu(item.habit)}
+              delayLongPress={380}
               className="flex-row items-center gap-3 rounded-2xl border border-neutral-200 bg-white px-4 py-3.5 active:bg-neutral-100"
             >
               <View

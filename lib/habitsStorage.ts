@@ -185,3 +185,39 @@ export async function getTodayHabits(): Promise<TodayHabitRow[]> {
     completed: todayLogCompleted(logs, habit.id, today),
   }));
 }
+
+export async function getHabitById(id: string): Promise<Habit | null> {
+  const habits = await getHabits();
+  return habits.find((h) => h.id === id) ?? null;
+}
+
+export async function updateHabit(
+  habitId: string,
+  patch: { title: string; time: TimeHHmm },
+): Promise<Habit> {
+  const habits = await getHabits();
+  const i = habits.findIndex((h) => h.id === habitId);
+  if (i === -1) {
+    throw new Error(`Unknown habit: ${habitId}`);
+  }
+  const updated: Habit = {
+    ...habits[i],
+    title: patch.title.trim(),
+    time: patch.time,
+  };
+  habits[i] = updated;
+  await saveHabits(habits);
+  return updated;
+}
+
+/** Removes the habit and all its logs. */
+export async function deleteHabit(habitId: string): Promise<void> {
+  const habits = await getHabits();
+  const nextHabits = habits.filter((h) => h.id !== habitId);
+  if (nextHabits.length === habits.length) {
+    throw new Error(`Unknown habit: ${habitId}`);
+  }
+  await saveHabits(nextHabits);
+  const logs = (await loadAndRepairLogs()).filter((l) => l.habitId !== habitId);
+  await saveLogs(logs);
+}
