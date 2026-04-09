@@ -36,22 +36,84 @@ export async function getHabits(): Promise<Habit[]> {
   return Array.isArray(list) ? list : [];
 }
 
-async function getLogs(): Promise<HabitLog[]> {
+/**
+ * One log row per (habitId, date). If duplicates exist, merge:
+ * `completed` is true if any duplicate was completed; keep the first `id`.
+ */
+export function mergeDuplicateDayLogs(logs: HabitLog[]): HabitLog[] {
+  const map = new Map<string, HabitLog>();
+  for (const l of logs) {
+    const key = `${l.habitId}\0${l.date}`;
+    const prev = map.get(key);
+    if (!prev) {
+      map.set(key, { ...l });
+    } else {
+      map.set(key, {
+        ...prev,
+        completed: prev.completed || l.completed,
+      });
+    }
+  }
+  return [...map.values()];
+}
+
+async function readLogsRaw(): Promise<HabitLog[]> {
   const list = await readJson<HabitLog[]>(KEY_LOGS, []);
   return Array.isArray(list) ? list : [];
 }
 
-/** All completion logs (read-only use for analytics / streaks). */
+/** Loads logs, repairs duplicates in storage when needed. */
+async function loadAndRepairLogs(): Promise<HabitLog[]> {
+  const raw = await readLogsRaw();
+  const merged = mergeDuplicateDayLogs(raw);
+  if (merged.length !== raw.length) {
+    await writeJson(KEY_LOGS, merged);
+  }
+  return merged;
+}
+
+async function getLogs(): Promise<HabitLog[]> {
+  return loadAndRepairLogs();
+}
+
+/** All completion logs (merged; safe for streaks / stats). */
 export async function getHabitLogs(): Promise<HabitLog[]> {
   return getLogs();
 }
 
 async function saveLogs(logs: HabitLog[]): Promise<void> {
-  await writeJson(KEY_LOGS, logs);
+  await writeJson(KEY_LOGS, mergeDuplicateDayLogs(logs));
 }
 
 async function saveHabits(habits: Habit[]): Promise<void> {
   await writeJson(KEY_HABITS, habits);
+}
+
+/**
+ * Ensures each habit has exactly one `HabitLog` for `date` (creates `completed: false` if missing).
+ * Call for “daily tracking” rows without guessing completion.
+ */
+export async function ensureTrackingLogsForDate(date: DateYMD): Promise<void> {
+  const habits = await getHabits();
+  let logs = await loadAndRepairLogs();
+  let changed = false;
+  for (const habit of habits) {
+    const exists = logs.some(
+      (l) => l.habitId === habit.id && l.date === date,
+    );
+    if (!exists) {
+      logs.push({
+        id: newId(),
+        habitId: habit.id,
+        date,
+        completed: false,
+      });
+      changed = true;
+    }
+  }
+  if (changed) {
+    await saveLogs(logs);
+  }
 }
 
 export type NewHabitInput = {
@@ -70,12 +132,13 @@ export async function addHabit(input: NewHabitInput): Promise<Habit> {
   };
   habits.push(habit);
   await saveHabits(habits);
+  await ensureTrackingLogsForDate(localDateYMD());
   return habit;
 }
 
 /**
- * Upserts today's log for `habitId` and flips `completed`.
- * At most one log per habit per calendar day (local).
+ * Flips `completed` for this habit on **today** (local). At most one row per habit per day
+ * after merge; placeholder rows come from `ensureTrackingLogsForDate`.
  */
 export async function toggleHabitCompletion(habitId: string): Promise<void> {
   const habits = await getHabits();
@@ -84,7 +147,8 @@ export async function toggleHabitCompletion(habitId: string): Promise<void> {
   }
 
   const today: DateYMD = localDateYMD();
-  const logs = await getLogs();
+  await ensureTrackingLogsForDate(today);
+  const logs = await loadAndRepairLogs();
   const i = logs.findIndex((l) => l.habitId === habitId && l.date === today);
 
   if (i === -1) {
@@ -111,10 +175,11 @@ function todayLogCompleted(
   return log?.completed ?? false;
 }
 
-/** All habits with completion state for today (local date). */
+/** All habits with completion state for today; ensures tracking rows for today exist first. */
 export async function getTodayHabits(): Promise<TodayHabitRow[]> {
-  const [habits, logs] = await Promise.all([getHabits(), getLogs()]);
   const today = localDateYMD();
+  await ensureTrackingLogsForDate(today);
+  const [habits, logs] = await Promise.all([getHabits(), loadAndRepairLogs()]);
   return habits.map((habit) => ({
     habit,
     completed: todayLogCompleted(logs, habit.id, today),

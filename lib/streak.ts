@@ -13,16 +13,19 @@ function completedOnDay(
 }
 
 /**
- * Consecutive completed days ending at `today` if today is done,
- * otherwise ending at yesterday (so the streak stays visible until you complete today).
+ * Consecutive **completed** local days for this habit, walking backward from
+ * today if today is done, otherwise from yesterday (streak still visible until you complete today).
+ * Days before `habit.createdAt` (local calendar) never count.
  */
 export function currentStreakForHabit(
   logs: HabitLog[],
-  habitId: string,
+  habit: Habit,
   today: DateYMD,
 ): number {
+  const createdDay = localDateYMD(new Date(habit.createdAt));
+
   let cursor = parseYMD(today);
-  if (!completedOnDay(logs, habitId, today)) {
+  if (!completedOnDay(logs, habit.id, today)) {
     cursor = addDays(cursor, -1);
   }
 
@@ -30,14 +33,15 @@ export function currentStreakForHabit(
   let d = cursor;
   for (let i = 0; i < 36500; i++) {
     const ymd = localDateYMD(d);
-    if (!completedOnDay(logs, habitId, ymd)) break;
+    if (ymd < createdDay) break;
+    if (!completedOnDay(logs, habit.id, ymd)) break;
     count++;
     d = addDays(d, -1);
   }
   return count;
 }
 
-/** Best current streak among all habits (motivation headline). */
+/** Highest current streak among habits (each respects its own `createdAt`). */
 export function maxStreakAcrossHabits(
   habits: Habit[],
   logs: HabitLog[],
@@ -46,6 +50,6 @@ export function maxStreakAcrossHabits(
   if (habits.length === 0) return 0;
   return Math.max(
     0,
-    ...habits.map((h) => currentStreakForHabit(logs, h.id, today)),
+    ...habits.map((h) => currentStreakForHabit(logs, h, today)),
   );
 }

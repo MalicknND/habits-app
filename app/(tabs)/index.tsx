@@ -26,10 +26,8 @@ export default function HomeScreen() {
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    const [todayRows, logs] = await Promise.all([
-      getTodayHabits(),
-      getHabitLogs(),
-    ]);
+    const todayRows = await getTodayHabits();
+    const logs = await getHabitLogs();
     const today = localDateYMD();
     setRows(todayRows);
     setStreak(
