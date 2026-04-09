@@ -3,11 +3,22 @@ import type { DailyTriggerInput } from "expo-notifications";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 
-import { getHabits } from "@/lib/habitsStorage";
-import type { TimeHHmm } from "@/types";
+import { getAppSettings } from "@/lib/appSettings";
+import { localDateYMD, parseYMD } from "@/lib/date";
+import { getHabitLogs, getHabits } from "@/lib/habitsStorage";
+import { completedOnDay } from "@/lib/services/streakService";
+import type { DateYMD, TimeHHmm } from "@/types";
 
 const STORAGE_MAP = "@habits/notification_ids";
 const ANDROID_CHANNEL = "habits-reminders";
+
+function primaryKey(habitId: string): string {
+  return `primary:${habitId}`;
+}
+
+function followupKey(habitId: string): string {
+  return `followup:${habitId}`;
+}
 
 function parseTimeHM(t: TimeHHmm): { hour: number; minute: number } {
   const [h, m] = t.split(":").map((x) => Number(x));
@@ -17,12 +28,34 @@ function parseTimeHM(t: TimeHHmm): { hour: number; minute: number } {
   };
 }
 
+function todayAtHM(ymd: DateYMD, hm: TimeHHmm): Date {
+  const d = parseYMD(ymd);
+  const { hour, minute } = parseTimeHM(hm);
+  d.setHours(hour, minute, 0, 0);
+  return d;
+}
+
 async function loadIdMap(): Promise<Record<string, string>> {
   const raw = await AsyncStorage.getItem(STORAGE_MAP);
   if (!raw) return {};
   try {
     const o = JSON.parse(raw) as Record<string, string>;
-    return o && typeof o === "object" ? o : {};
+    if (!o || typeof o !== "object") return {};
+    const migrated: Record<string, string> = {};
+    let changed = false;
+    for (const [k, v] of Object.entries(o)) {
+      if (typeof v !== "string") continue;
+      if (k.includes(":")) {
+        migrated[k] = v;
+      } else {
+        migrated[primaryKey(k)] = v;
+        changed = true;
+      }
+    }
+    if (changed) {
+      await AsyncStorage.setItem(STORAGE_MAP, JSON.stringify(migrated));
+    }
+    return migrated;
   } catch {
     return {};
   }
@@ -56,7 +89,8 @@ export function configureNotificationHandler(): void {
 }
 
 /**
- * Aligns scheduled local notifications with current habits (daily at each habit's time).
+ * Aligns scheduled local notifications with current habits.
+ * Primary: daily at each habit's time. Follow-up: once today if enabled, habit not done, time still ahead.
  * No-op on web. Requests permission when habits exist.
  */
 export async function syncHabitNotifications(): Promise<void> {
@@ -84,20 +118,27 @@ export async function syncHabitNotifications(): Promise<void> {
 
   await ensureAndroidChannel();
 
+  const settings = await getAppSettings();
+  const today = localDateYMD();
+  const logs = await getHabitLogs();
+
   let map = await loadIdMap();
   const alive = new Set(habits.map((h) => h.id));
 
-  for (const hid of Object.keys(map)) {
-    if (!alive.has(hid)) {
-      await Notifications.cancelScheduledNotificationAsync(map[hid]!);
-      delete map[hid];
+  for (const k of Object.keys(map)) {
+    const hid =
+      k.startsWith("primary:") ? k.slice(8) : k.startsWith("followup:") ? k.slice(9) : null;
+    if (hid && !alive.has(hid)) {
+      await Notifications.cancelScheduledNotificationAsync(map[k]!);
+      delete map[k];
     }
   }
 
   for (const h of habits) {
-    const prev = map[h.id];
-    if (prev) {
-      await Notifications.cancelScheduledNotificationAsync(prev);
+    const pk = primaryKey(h.id);
+    const prevP = map[pk];
+    if (prevP) {
+      await Notifications.cancelScheduledNotificationAsync(prevP);
     }
     const { hour, minute } = parseTimeHM(h.time);
     const trigger: DailyTriggerInput = {
@@ -111,11 +152,41 @@ export async function syncHabitNotifications(): Promise<void> {
       content: {
         title: "Habit reminder",
         body: `Time for: ${h.title}`,
-        data: { habitId: h.id },
+        data: { habitId: h.id, kind: "primary" },
       },
       trigger,
     });
-    map = { ...map, [h.id]: nid };
+    map = { ...map, [pk]: nid };
+
+    const fk = followupKey(h.id);
+    const prevF = map[fk];
+    if (prevF) {
+      await Notifications.cancelScheduledNotificationAsync(prevF);
+      delete map[fk];
+    }
+
+    if (settings.followUpReminders) {
+      const done = completedOnDay(logs, h.id, today);
+      if (!done) {
+        const when = todayAtHM(today, settings.followUpTime);
+        const now = new Date();
+        if (when.getTime() > now.getTime()) {
+          const fid = await Notifications.scheduleNotificationAsync({
+            content: {
+              title: "Rappel",
+              body: `Pas encore coché : ${h.title}`,
+              data: { habitId: h.id, kind: "followup" },
+            },
+            trigger: {
+              type: Notifications.SchedulableTriggerInputTypes.DATE,
+              date: when,
+              ...(Platform.OS === "android" ? { channelId: ANDROID_CHANNEL } : {}),
+            },
+          });
+          map = { ...map, [fk]: fid };
+        }
+      }
+    }
   }
 
   await saveIdMap(map);

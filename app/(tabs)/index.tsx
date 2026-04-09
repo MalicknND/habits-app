@@ -11,10 +11,19 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAppTheme } from "@/context/AppTheme";
+import { getAppSettings } from "@/lib/appSettings";
 import { syncHabitNotifications } from "@/lib/habitNotifications";
 import { localDateYMD } from "@/lib/date";
 import { getAppChrome } from "@/lib/screenBackground";
-import type { Habit } from "@/types";
+import {
+  disciplineScore,
+  sortTodayRowsByPriority,
+} from "@/lib/services/habitService";
+import {
+  maxStreakAcrossHabits,
+  strictMasterStreak,
+} from "@/lib/services/streakService";
+import type { Habit, HabitPriority } from "@/types";
 import {
   deleteHabit,
   getHabitLogs,
@@ -22,7 +31,18 @@ import {
   toggleHabitCompletion,
   type TodayHabitRow,
 } from "@/lib/habitsStorage";
-import { maxStreakAcrossHabits } from "@/lib/streak";
+
+function priorityLabel(p: HabitPriority): string {
+  if (p === "high") return "High";
+  if (p === "low") return "Low";
+  return "Med";
+}
+
+function priorityBadgeColor(p: HabitPriority): string {
+  if (p === "high") return "#dc2626";
+  if (p === "low") return "#64748b";
+  return "#ca8a04";
+}
 
 export default function HomeScreen() {
   const { resolvedScheme } = useAppTheme();
@@ -30,6 +50,9 @@ export default function HomeScreen() {
 
   const [rows, setRows] = useState<TodayHabitRow[]>([]);
   const [streak, setStreak] = useState(0);
+  const [strictStreak, setStrictStreak] = useState(0);
+  const [strictMode, setStrictMode] = useState(false);
+  const [discipline, setDiscipline] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -37,14 +60,14 @@ export default function HomeScreen() {
     const todayRows = await getTodayHabits();
     const logs = await getHabitLogs();
     const today = localDateYMD();
-    setRows(todayRows);
-    setStreak(
-      maxStreakAcrossHabits(
-        todayRows.map((r) => r.habit),
-        logs,
-        today,
-      ),
-    );
+    const habits = todayRows.map((r) => r.habit);
+    const sorted = sortTodayRowsByPriority(todayRows);
+    const settings = await getAppSettings();
+    setRows(sorted);
+    setDiscipline(disciplineScore(sorted));
+    setStrictMode(settings.strictMode);
+    setStreak(maxStreakAcrossHabits(habits, logs, today));
+    setStrictStreak(strictMasterStreak(habits, logs, today));
   }, []);
 
   useFocusEffect(
@@ -68,12 +91,11 @@ export default function HomeScreen() {
     setBusyId(habitId);
     try {
       await toggleHabitCompletion(habitId);
+      await syncHabitNotifications();
       await refresh();
     } catch (e) {
-      Alert.alert(
-        "Update failed",
-        e instanceof Error ? e.message : "Could not save completion.",
-      );
+      const msg = e instanceof Error ? e.message : "Could not save completion.";
+      Alert.alert("Update failed", msg);
     } finally {
       setBusyId(null);
     }
@@ -149,12 +171,38 @@ export default function HomeScreen() {
           Today
         </Text>
         <Text style={{ marginTop: 4, fontSize: 16, color: c.textSubtle }}>
+          Discipline{" "}
+          <Text style={{ fontWeight: "700", color: c.text }}>
+            {discipline === null ? "—" : `${discipline}%`}
+          </Text>
+          {rows.length > 0 ? (
+            <Text style={{ color: c.textMuted }}>
+              {" "}
+              ({rows.filter((r) => r.completed).length}/{rows.length})
+            </Text>
+          ) : null}
+        </Text>
+        <Text style={{ marginTop: 4, fontSize: 16, color: c.textSubtle }}>
           Streak{" "}
           <Text style={{ fontWeight: "600", color: c.text }}>🔥 {streak} day{streak === 1 ? "" : "s"}</Text>
+          {strictMode ? (
+            <Text style={{ color: c.textSubtle }}>
+              {" · "}
+              <Text style={{ fontWeight: "600", color: "#b45309" }}>
+                Strict {strictStreak}d
+              </Text>
+            </Text>
+          ) : null}
         </Text>
-        <Text style={{ marginTop: 8, fontSize: 12, color: c.hint }}>
-          Long press a habit to edit or delete.
-        </Text>
+        {strictMode ? (
+          <Text style={{ marginTop: 10, fontSize: 13, lineHeight: 18, color: "#b45309", fontWeight: "500" }}>
+            Strict discipline: you cannot undo a completed habit. Every habit must be done every day — one miss breaks the strict streak.
+          </Text>
+        ) : (
+          <Text style={{ marginTop: 8, fontSize: 12, color: c.hint }}>
+            Long press a habit to edit or delete.
+          </Text>
+        )}
       </View>
 
       <FlatList
@@ -181,6 +229,7 @@ export default function HomeScreen() {
         ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
         renderItem={({ item }) => {
           const disabled = busyId === item.habit.id;
+          const pr = item.habit.priority;
           return (
             <Pressable
               disabled={disabled}
@@ -217,9 +266,23 @@ export default function HomeScreen() {
                 ) : null}
               </View>
               <View style={{ flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                <Text style={{ flex: 1, fontSize: 16, fontWeight: "500", color: c.text }} numberOfLines={2}>
-                  {item.habit.title}
-                </Text>
+                <View style={{ flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <View
+                    style={{
+                      paddingHorizontal: 6,
+                      paddingVertical: 2,
+                      borderRadius: 6,
+                      backgroundColor: `${priorityBadgeColor(pr)}22`,
+                    }}
+                  >
+                    <Text style={{ fontSize: 10, fontWeight: "700", color: priorityBadgeColor(pr) }}>
+                      {priorityLabel(pr).toUpperCase()}
+                    </Text>
+                  </View>
+                  <Text style={{ flex: 1, fontSize: 16, fontWeight: "500", color: c.text }} numberOfLines={2}>
+                    {item.habit.title}
+                  </Text>
+                </View>
                 <Text style={{ fontSize: 14, color: c.textMuted }}>
                   {item.habit.time}
                 </Text>

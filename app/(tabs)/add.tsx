@@ -20,6 +20,7 @@ import { parseTodayTimeHHmm, toTimeHHmm } from "@/lib/date";
 import { syncHabitNotifications } from "@/lib/habitNotifications";
 import { addHabit } from "@/lib/habitsStorage";
 import { getAppChrome } from "@/lib/screenBackground";
+import type { HabitPriority } from "@/types";
 
 function defaultTimeDate(): Date {
   const d = new Date();
@@ -36,6 +37,7 @@ export default function AddHabitScreen() {
   const [webTime, setWebTime] = useState("09:00");
   const [iosPickerOpen, setIosPickerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [priority, setPriority] = useState<HabitPriority>("medium");
 
   const openTimePicker = () => {
     if (Platform.OS === "web") return;
@@ -72,11 +74,12 @@ export default function AddHabitScreen() {
 
     setSaving(true);
     try {
-      await addHabit({ title: trimmed, time: toTimeHHmm(timeDate) });
+      await addHabit({ title: trimmed, time: toTimeHHmm(timeDate), priority });
       await syncHabitNotifications();
       setTitle("");
       setTime(defaultTimeDate());
       setWebTime("09:00");
+      setPriority("medium");
       router.push("/");
     } catch (e) {
       Alert.alert(
@@ -123,6 +126,38 @@ export default function AddHabitScreen() {
             editable={!saving}
             returnKeyType="next"
           />
+
+          <Text style={{ marginBottom: 8, marginTop: 24, fontSize: 11, fontWeight: "600", letterSpacing: 0.5, textTransform: "uppercase", color: c.textMuted }}>
+            Priority
+          </Text>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+            {(
+              [
+                { v: "high" as const, label: "High" },
+                { v: "medium" as const, label: "Medium" },
+                { v: "low" as const, label: "Low" },
+              ] as const
+            ).map(({ v, label }) => {
+              const on = priority === v;
+              return (
+                <Pressable
+                  key={v}
+                  onPress={() => setPriority(v)}
+                  disabled={saving}
+                  style={{
+                    paddingHorizontal: 14,
+                    paddingVertical: 10,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: on ? "#2563eb" : c.border,
+                    backgroundColor: on ? (resolvedScheme === "dark" ? "rgba(37, 99, 235, 0.25)" : "rgba(37, 99, 235, 0.12)") : c.inputBg,
+                  }}
+                >
+                  <Text style={{ fontSize: 14, fontWeight: "600", color: on ? "#60a5fa" : c.text }}>{label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
 
           <Text style={{ marginBottom: 6, marginTop: 24, fontSize: 11, fontWeight: "600", letterSpacing: 0.5, textTransform: "uppercase", color: c.textMuted }}>
             Time

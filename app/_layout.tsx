@@ -1,6 +1,6 @@
 import { Stack } from "expo-router";
 import { useEffect } from "react";
-import { View } from "react-native";
+import { AppState, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 
 import { AppThemeProvider, useAppTheme } from "@/context/AppTheme";
@@ -47,6 +47,10 @@ function RootLayoutInner() {
 
   useEffect(() => {
     void syncHabitNotifications();
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") void syncHabitNotifications();
+    });
+    return () => sub.remove();
   }, []);
 
   return (

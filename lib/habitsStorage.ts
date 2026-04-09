@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import type { DateYMD, Habit, HabitLog, TimeHHmm } from "@/types";
+import type { DateYMD, Habit, HabitLog, HabitPriority, TimeHHmm } from "@/types";
 
+import { getAppSettings } from "@/lib/appSettings";
 import { localDateYMD } from "@/lib/date";
 
 const KEY_HABITS = "@habits/habits";
@@ -30,10 +31,25 @@ async function writeJson(key: string, value: unknown): Promise<void> {
   await AsyncStorage.setItem(key, JSON.stringify(value));
 }
 
+function normalizeHabit(raw: unknown): Habit {
+  const h = raw as Partial<Habit> & Pick<Habit, "id">;
+  const p = h.priority;
+  const priority: HabitPriority =
+    p === "high" || p === "medium" || p === "low" ? p : "medium";
+  return {
+    id: h.id,
+    title: typeof h.title === "string" ? h.title : "",
+    time: typeof h.time === "string" ? h.time : "09:00",
+    createdAt: typeof h.createdAt === "string" ? h.createdAt : new Date().toISOString(),
+    priority,
+  };
+}
+
 /** All habits, newest last (order preserved from storage). */
 export async function getHabits(): Promise<Habit[]> {
   const list = await readJson<Habit[]>(KEY_HABITS, []);
-  return Array.isArray(list) ? list : [];
+  if (!Array.isArray(list)) return [];
+  return list.map((h) => normalizeHabit(h));
 }
 
 /**
@@ -119,6 +135,7 @@ export async function ensureTrackingLogsForDate(date: DateYMD): Promise<void> {
 export type NewHabitInput = {
   title: string;
   time: TimeHHmm;
+  priority?: HabitPriority;
 };
 
 /** Appends a habit with a generated id and `createdAt` (ISO). */
@@ -129,6 +146,7 @@ export async function addHabit(input: NewHabitInput): Promise<Habit> {
     title: input.title.trim(),
     time: input.time,
     createdAt: new Date().toISOString(),
+    priority: input.priority ?? "medium",
   };
   habits.push(habit);
   await saveHabits(habits);
@@ -160,6 +178,14 @@ export async function toggleHabitCompletion(habitId: string): Promise<void> {
     });
   } else {
     const prev = logs[i];
+    if (prev.completed) {
+      const { strictMode } = await getAppSettings();
+      if (strictMode) {
+        throw new Error(
+          "Discipline stricte : une habitude validée ne peut pas être annulée.",
+        );
+      }
+    }
     logs[i] = { ...prev, completed: !prev.completed };
   }
 
@@ -193,7 +219,7 @@ export async function getHabitById(id: string): Promise<Habit | null> {
 
 export async function updateHabit(
   habitId: string,
-  patch: { title: string; time: TimeHHmm },
+  patch: { title: string; time: TimeHHmm; priority?: HabitPriority },
 ): Promise<Habit> {
   const habits = await getHabits();
   const i = habits.findIndex((h) => h.id === habitId);
@@ -204,6 +230,7 @@ export async function updateHabit(
     ...habits[i],
     title: patch.title.trim(),
     time: patch.time,
+    priority: patch.priority ?? habits[i]!.priority,
   };
   habits[i] = updated;
   await saveHabits(habits);

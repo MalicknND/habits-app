@@ -4,6 +4,9 @@ export type DateYMD = string;
 /** Time of day for a habit. Convention: `HH:mm` (24h). */
 export type TimeHHmm = string;
 
+/** Importance for ordering and focus (defaults to `medium` for legacy data). */
+export type HabitPriority = "high" | "medium" | "low";
+
 export interface Habit {
   id: string;
   title: string;
@@ -11,6 +14,7 @@ export interface Habit {
   time: TimeHHmm;
   /** ISO 8601 timestamp when the habit was created */
   createdAt: string;
+  priority: HabitPriority;
 }
 
 export interface HabitLog {
