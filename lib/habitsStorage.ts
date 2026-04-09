@@ -41,6 +41,11 @@ async function getLogs(): Promise<HabitLog[]> {
   return Array.isArray(list) ? list : [];
 }
 
+/** All completion logs (read-only use for analytics / streaks). */
+export async function getHabitLogs(): Promise<HabitLog[]> {
+  return getLogs();
+}
+
 async function saveLogs(logs: HabitLog[]): Promise<void> {
   await writeJson(KEY_LOGS, logs);
 }
