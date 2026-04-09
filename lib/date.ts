@@ -1,4 +1,4 @@
-import type { DateYMD } from "@/types";
+import type { DateYMD, TimeHHmm } from "@/types";
 
 /** Local calendar date as `YYYY-MM-DD` (device timezone). */
 export function localDateYMD(date = new Date()): DateYMD {
@@ -22,4 +22,23 @@ export function addDays(date: Date, delta: number): Date {
   const x = new Date(date.getFullYear(), date.getMonth(), date.getDate());
   x.setDate(x.getDate() + delta);
   return x;
+}
+
+/** Format local time as `HH:mm` (24h). */
+export function toTimeHHmm(d: Date): TimeHHmm {
+  const h = String(d.getHours()).padStart(2, "0");
+  const m = String(d.getMinutes()).padStart(2, "0");
+  return `${h}:${m}`;
+}
+
+/**
+ * Parse `HH:mm` against today's calendar date in local time.
+ * Returns `null` if invalid.
+ */
+export function parseTodayTimeHHmm(s: string, base = new Date()): Date | null {
+  const m = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec(s.trim());
+  if (!m) return null;
+  const d = new Date(base.getFullYear(), base.getMonth(), base.getDate());
+  d.setHours(Number(m[1]), Number(m[2]), 0, 0);
+  return d;
 }
